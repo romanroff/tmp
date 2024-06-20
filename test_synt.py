@@ -84,10 +84,12 @@ def calculate(data):
         for u in Q.nodes:
             if u in Q[u]:
                 Q.remove_edge(u, u)
-        city_tests.test_graph(Q,
-                              f'PlanePoints_{len(G.nodes)}_{round(nx.density(Q) * 10000) / 10000}',
-                              '0',
-                              points=points, pos=NUMBER)
+        for i in range(5):
+            city_tests.test_graph(Q,
+                                  f'PlanePoints{i}_{len(G.nodes)}_{round(nx.density(Q) * 10000) / 10000}',
+                                  '0',
+                                  points=points, pos=NUMBER)
+
         NUMBER += THREADS
 
 
@@ -110,7 +112,7 @@ if __name__ == '__main__':
     dens = np.array(dens)
     dens = dens[dens < 0.05]
 
-    NODES = [2000, 5000, 10000, 15000, 20000, 30000, 50000]
+    NODES = [2000, 3000,]
     for N in NODES:
         if os.path.isfile(f'{N}.pkl'):
            continue
