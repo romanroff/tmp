@@ -113,7 +113,6 @@ def test_graph(graph: nx.Graph, name: str, city_id: str, points: list[tuple[int,
               total=max_alpha) as progres:
         prev = 0
         for r in resolutions:
-            # for r in tqdm(resolutions, desc='resolutions for {}_{:.4f}'.format(len(graph.nodes),nx.density(graph)), position=pos):
             start = time.time()
             layer, build_communities, build_additional, build_centroid_graph = generate_layer(graph, r,
                                                                                               has_coordinates=has_coords)
@@ -149,10 +148,13 @@ def test_graph(graph: nx.Graph, name: str, city_id: str, points: list[tuple[int,
             result.points_results.append(generate_result(usual_results, tmp, r, layer))
             progres.update(a - prev)
             prev = a
+
         progres.update(0.4 - prev)
+
     result.save()
-    # s = [p.speed_up[0] for p in result.points_results]
-    # print(np.mean(result.points_results[np.argmax(s)].errors), np.std(result.points_results[0].errors))
-    # print(np.max(result.points_results[np.argmax(s)].errors))
-    # print(max(s))
+    if logs:
+        s = [p.speed_up[0] for p in result.points_results]
+        print(np.mean(result.points_results[np.argmax(s)].errors), np.std(result.points_results[0].errors))
+        print(np.max(result.points_results[np.argmax(s)].errors))
+        print(max(s))
     return result

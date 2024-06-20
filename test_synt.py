@@ -1,5 +1,7 @@
 import argparse
 import math
+import os
+import pickle
 import random
 import sys
 from multiprocessing import Pool
@@ -20,15 +22,6 @@ def gen(N):
         x = random.random() * W
         y = random.random() * H
         Q.add_node(i, x=x, y=y)
-
-    m = 100000
-    for u, d in Q.nodes(data=True):
-        for j, t in Q.nodes(data=True):
-            if u == j:
-                continue
-            dd = (d['x'] - t['x']) ** 2 + (d['y'] - t['y']) ** 2
-            m = min(m, dd)
-    # print('min distance', m)
     return Q
 
 
@@ -73,12 +66,18 @@ def add_density(H: nx.Graph, r) -> nx.Graph:
 
 
 def calculate(data):
-    G = data[0]
+    N = data[0]
     dens = data[1]
-    points = data[2]
+    points_number = data[2]
     NUMBER = data[3]
     THREADS = data[4]
-    N = len(G.nodes)
+    with open(f'{N}.pkl', 'rb') as file:
+        G = pickle.load(file)
+        file.close()
+
+    points = [graph_generator.get_node_for_initial_graph_v2(G) for _ in
+              range(points_number)]
+
     for d in dens:
         k = d * (N - 1)
         Q = add_density(G, k)
@@ -112,14 +111,18 @@ if __name__ == '__main__':
     dens = dens[dens < 0.05]
 
     NODES = [2000, 5000, 10000, 15000, 20000, 30000, 50000]
+    for N in NODES:
+        if os.path.isfile(f'{N}.pkl'):
+           continue
+        G = gen(N)
+        with open(f'{N}.pkl', 'wb') as fp:
+            pickle.dump(G, fp)
+            fp.close()
 
+    total_len = len(dens)
+    data = [[N, dens[i: total_len: total],points_number, j * total_len + (i + 1), total] for i in range(total) for j,N in enumerate(NODES)]
+    data.sort(key= lambda x: x[0])
+    for i in data:
+        print(i)
     with Pool(total) as p:
-        for j, N in enumerate(NODES):
-            G = gen(N)
-
-            points = [graph_generator.get_node_for_initial_graph_v2(G) for _ in
-                      range(points_number)]
-
-            total_len = len(dens)
-            data = [[G, dens[i: total_len: total], points, j * total_len + (i + 1), total] for i in range(total)]
-            p.map(calculate, data)
+        p.map(calculate, data)
