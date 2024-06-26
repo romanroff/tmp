@@ -132,7 +132,7 @@ def build_center_graph(
     """
     centers = {}
     X = nx.Graph()
-    for cls, _ in tqdm(enumerate(communities), total = len(communities)):
+    for cls, _ in enumerate(communities):
         gc = extract_cluster_list_subgraph(graph, [cls], communities)
         if has_coordinates:
             _p: dict[int, dict[int, float]] = {u: {v: get_dist(du, dv) for v, dv in gc.nodes(data=True)} for u, du in
@@ -155,7 +155,7 @@ def build_center_graph(
         centers[cls] = min_node
     if len(X.nodes) == 1:
         return X
-    for u, d in tqdm(X.nodes(data=True)):
+    for u, d in X.nodes(data=True):
         for v in cluster_to_neighboring_cluster[d['cluster']]:
             dv = X.nodes[centers[v]]
             if has_coordinates:

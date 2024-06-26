@@ -91,7 +91,6 @@ def test_graph(graph: nx.Graph, name: str, city_id: str, points: list[tuple[int,
         resolutions += [i for i in range(100, 500, 10)]
         resolutions += [i for i in range(500, 1000, 50)]
         resolutions += [i for i in range(1000, 2000, 200)]
-    resolutions = [2]
     if points is None:
         N: int = 1000
         points = [get_node_for_initial_graph_v2(graph) for _ in trange(N, desc='generate points')]

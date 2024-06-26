@@ -23,6 +23,11 @@ def get_rand_graph(N, p):
                 break
         for i in range(len(tmp) - 1):
             G.add_edge(tmp[i], tmp[i + 1])
+    for e in G.edges:
+        G.add_edge(e[0], e[1], length=np.random.random_sample() + 0.001)
+    for u in G.nodes:
+        if u in G[u]:
+            G.remove_edge(u, u)
     return G
 
 
@@ -40,9 +45,7 @@ def calculate_rand(data):
                   range(points_number)]
         r = city_tests.get_resolution_for_alpha(G, 0.2)
         Q = G
-        for u in Q.nodes:
-            if u in Q[u]:
-                Q.remove_edge(u, u)
+
         for i in range(1):
             city_tests.test_graph(Q,
                                   f'Rand{ii}_{len(G.nodes)}_{round(nx.density(Q) * 10000) / 10000}',
@@ -67,11 +70,13 @@ if __name__ == '__main__':
     while dens[-1] * 1.6 < 1:
         dens.append(dens[-1] * 1.3)
     dens.append(1)
+    dens.append(0.6)
+    dens.append(0.8)
     dens = np.array(dens)
     # dens = dens[dens < 0.05]
 
-    for ii in range(5):
-        NODES = [5000]
+    for ii in range(1):
+        NODES = [2000]
         total_len = len(dens)
         data = [[N, dens[i: total_len: total], points_number, j * total_len + (i + 1), total, ii] for i in range(total)
                 for
