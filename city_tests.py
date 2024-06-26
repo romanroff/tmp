@@ -165,3 +165,20 @@ def test_graph(graph: nx.Graph, name: str, city_id: str, points: list[tuple[int,
         print(np.max(result.points_results[np.argmax(s)].errors))
         print(max(s))
     return result
+
+
+
+def get_resolution_for_alpha(graph: nx.Graph, alpha:float ) -> float:
+    right_resolution = 5000
+    left_resolution = 0.01
+    y = len(graph_generator.resolve_communities(graph, (left_resolution+right_resolution)/2)) / len(graph.nodes)
+    min_dst = 0.001
+    print('start generate resolutions')
+    while abs(alpha - y) > min_dst:
+        if y > alpha:
+            right_resolution = (left_resolution+right_resolution)/2
+        else:
+            left_resolution = (left_resolution + right_resolution) / 2
+        y = len(graph_generator.resolve_communities(graph, (left_resolution + right_resolution) / 2)) / len(graph.nodes)
+    return (left_resolution + right_resolution) / 2
+
