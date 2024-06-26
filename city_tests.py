@@ -79,7 +79,7 @@ def generate_result(
 def test_graph(graph: nx.Graph, name: str, city_id: str, points: list[tuple[int, int]] = None,
                resolutions: list[float] = None, pos=2, logs=True) -> CityResult:
     # print(name, nx.is_connected(graph))
-    max_alpha = 1
+    max_alpha = 1 if resolutions is None else max(resolutions)
     delta = max_alpha / 40
 
     if resolutions is None:
@@ -119,8 +119,6 @@ def test_graph(graph: nx.Graph, name: str, city_id: str, points: list[tuple[int,
             if len(community) < 10:
                 continue
             a = len(community) / len(graph.nodes)
-
-
             has = False
             for curr in alphas:
                 if abs(curr - a) < delta:
@@ -155,7 +153,7 @@ def test_graph(graph: nx.Graph, name: str, city_id: str, points: list[tuple[int,
             progres.update(a - prev)
             prev = a
 
-        progres.update(0.4 - prev)
+        progres.update(max_alpha - prev)
 
     result.save()
     if logs:
