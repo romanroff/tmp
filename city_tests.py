@@ -4,6 +4,7 @@ import networkx as nx
 import numpy as np
 from tqdm import tqdm, trange
 
+import graph_generator
 from common import GraphLayer, CentroidResult, CityResult
 from graph_generator import generate_layer, get_node_for_initial_graph_v2
 from pfa import find_path
@@ -76,20 +77,21 @@ def generate_result(
 
 
 def test_graph(graph: nx.Graph, name: str, city_id: str, points: list[tuple[int, int]] = None,
-               resolutions: list[float] = None, pos=2, logs=False) -> CityResult:
+               resolutions: list[float] = None, pos=2, logs=True) -> CityResult:
     # print(name, nx.is_connected(graph))
-    max_alpha = 0.4
+    max_alpha = 1
     delta = max_alpha / 40
 
     if resolutions is None:
         resolutions = []
+        resolutions += [i/10 for i in range(1, 10, 1)]
         resolutions += [i for i in range(1, 10, 1)]
         resolutions += [i for i in range(10, 50, 2)]
         resolutions += [i for i in range(50, 100, 5)]
         resolutions += [i for i in range(100, 500, 10)]
         resolutions += [i for i in range(500, 1000, 50)]
         resolutions += [i for i in range(1000, 2000, 200)]
-
+    resolutions = [2]
     if points is None:
         N: int = 1000
         points = [get_node_for_initial_graph_v2(graph) for _ in trange(N, desc='generate points')]
@@ -114,9 +116,12 @@ def test_graph(graph: nx.Graph, name: str, city_id: str, points: list[tuple[int,
         prev = 0
         for r in resolutions:
             start = time.time()
-            layer, build_communities, build_additional, build_centroid_graph = generate_layer(graph, r,
-                                                                                              has_coordinates=has_coords)
-            a = len(layer.communities) / len(layer.graph.nodes)
+            community = graph_generator.resolve_communities(graph, r)
+            if len(community) < 10:
+                continue
+            a = len(community) / len(graph.nodes)
+
+
             has = False
             for curr in alphas:
                 if abs(curr - a) < delta:
@@ -130,11 +135,13 @@ def test_graph(graph: nx.Graph, name: str, city_id: str, points: list[tuple[int,
                 else:
                     continue
             alphas.add(a)
+            layer, build_communities, build_additional, build_centroid_graph = generate_layer(graph, r,
+                                                                                              has_coordinates=has_coords,
+                                                                                              communities=community)
             tmp = test_layer(points, layer)
             total = time.time() - start
-            while len(tmp[1]) < N // 10 * 9:
-                tmp = test_layer(points, layer)
             text = """
+                name:           {}
                 alpha:          {:4f}
                 total time:     {:.3f}
                 prepare time:   {:.3f} 
@@ -142,7 +149,7 @@ def test_graph(graph: nx.Graph, name: str, city_id: str, points: list[tuple[int,
                     build_additional:       {:.3f}
                     build_centroid_graph:   {:.3f}
                 pfa time:       {:.3f}
-            """.format(a, total, total - tmp[0], build_communities, build_additional, build_centroid_graph, tmp[0])
+            """.format(name,a, total, total - tmp[0], build_communities, build_additional, build_centroid_graph, tmp[0])
             if logs:
                 tqdm.write(text)
             result.points_results.append(generate_result(usual_results, tmp, r, layer))
