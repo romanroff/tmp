@@ -1,4 +1,3 @@
-import argparse
 import math
 import os
 import pickle
@@ -9,7 +8,6 @@ from multiprocessing import Pool
 import networkx as nx
 import numpy as np
 from scipy.spatial import KDTree as kd
-from tqdm import trange, tqdm
 
 import city_tests
 import graph_generator
@@ -65,12 +63,26 @@ def add_density(H: nx.Graph, r) -> nx.Graph:
     return _G
 
 
+def get_rand_graph(N, p):
+    G = nx.fast_gnp_random_graph(N, p, directed=False)
+    if not nx.is_connected(G):
+        tmp = []
+        for n in nx.connected_components(G):
+            for q in n:
+                tmp.append(q)
+                break
+        for i in range(len(tmp) - 1):
+            G.add_edge(tmp[i], tmp[i + 1])
+    return G
+
+
 def calculate(data):
     N = data[0]
     dens = data[1]
     points_number = data[2]
     NUMBER = data[3]
     THREADS = data[4]
+    ii = data[5]
     with open(f'{N}.pkl', 'rb') as file:
         G = pickle.load(file)
         file.close()
@@ -84,12 +96,38 @@ def calculate(data):
         for u in Q.nodes:
             if u in Q[u]:
                 Q.remove_edge(u, u)
-        for i in range(5):
+        for i in range(1):
             city_tests.test_graph(Q,
-                                  f'PlanePoints{i}_{len(G.nodes)}_{round(nx.density(Q) * 10000) / 10000}',
+                                  f'PlanePoints{ii}_{len(G.nodes)}_{round(nx.density(Q) * 10000) / 10000}',
                                   '0',
                                   points=points, pos=NUMBER)
 
+        NUMBER += THREADS
+
+
+def calculate_rand(data):
+    N = data[0]
+    dens = data[1]
+    points_number = data[2]
+    NUMBER = data[3]
+    THREADS = data[4]
+    ii = data[5]
+    for d in dens:
+        G = get_rand_graph(N, max(min(1, d), 0))
+
+        points = [graph_generator.get_node_for_initial_graph_v2(G) for _ in
+                  range(points_number)]
+
+        k = d * (N - 1)
+        Q = G
+        for u in Q.nodes:
+            if u in Q[u]:
+                Q.remove_edge(u, u)
+        for i in range(1):
+            city_tests.test_graph(Q,
+                                  f'Rand{ii}_{len(G.nodes)}_{round(nx.density(Q) * 10000) / 10000}',
+                                  '0',
+                                  points=points, pos=NUMBER)
         NUMBER += THREADS
 
 
@@ -110,21 +148,31 @@ if __name__ == '__main__':
         dens.append(dens[-1] * 1.3)
     dens.append(1)
     dens = np.array(dens)
-    dens = dens[dens < 0.05]
+    # dens = dens[dens < 0.05]
 
-    NODES = [2000, 3000,]
-    for N in NODES:
-        if os.path.isfile(f'{N}.pkl'):
-           continue
-        G = gen(N)
-        with open(f'{N}.pkl', 'wb') as fp:
-            pickle.dump(G, fp)
-            fp.close()
+    for ii in range(5):
+        NODES = [2000]
+        for N in NODES:
+            if os.path.isfile(f'{N}.pkl'):
+                continue
+            G = gen(N)
+            with open(f'{N}.pkl', 'wb') as fp:
+                pickle.dump(G, fp)
+                fp.close()
 
-    total_len = len(dens)
-    data = [[N, dens[i: total_len: total],points_number, j * total_len + (i + 1), total] for i in range(total) for j,N in enumerate(NODES)]
-    data.sort(key= lambda x: x[0])
-    for i in data:
-        print(i)
-    with Pool(total) as p:
-        p.map(calculate, data)
+        total_len = len(dens)
+        data = [[N, dens[i: total_len: total], points_number, j * total_len + (i + 1), total,ii] for i in range(total) for
+                j, N in enumerate(NODES)]
+        data.sort(key=lambda x: x[0])
+        with Pool(total) as p:
+            p.map(calculate, data)
+        os.remove(f'{N}.pkl')
+
+    for ii in range(5):
+        NODES = [2000]
+        total_len = len(dens)
+        data = [[N, dens[i: total_len: total], points_number, j * total_len + (i + 1), total,ii] for i in range(total) for
+                j, N in enumerate(NODES)]
+        data.sort(key=lambda x: x[0])
+        with Pool(total) as p:
+            p.map(calculate_rand, data)

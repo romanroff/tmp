@@ -1,3 +1,4 @@
+import itertools
 import math
 import random
 import time
@@ -5,7 +6,7 @@ import time
 import networkx as nx
 import numpy as np
 import osmnx as ox
-
+from tqdm import tqdm
 from common import GraphLayer
 
 
@@ -60,11 +61,12 @@ def resolve_communities(H: nx.Graph, r: float = 20) -> list[set[int]]:
     return cls
 
 
-def get_cluster_to_neighboring_clusters_and_bridge_points(H: nx.Graph) -> tuple[
-    dict[int, set[int]], dict[int, set[int]]]:
-    cls_to_neighboring_cls = {}
-    cls_to_bridge_points = {}
+def generate_communities_subgraph(H: nx.Graph, communities: list[set[int]]) -> list[nx.Graph]:
+    return [extract_cluster_subgraph(H, i) for i, c in enumerate(communities)]
 
+
+def get_cluster_to_neighboring_clusters(H: nx.Graph) -> dict[int, set[int]]:
+    cls_to_neighboring_cls = {}
     for u in H.nodes():
         du = H.nodes[u]
         for v in H[u]:
@@ -73,22 +75,33 @@ def get_cluster_to_neighboring_clusters_and_bridge_points(H: nx.Graph) -> tuple[
                 continue
             c1 = dv['cluster']
             c2 = du['cluster']
-
             if not (c1 in cls_to_neighboring_cls):
                 cls_to_neighboring_cls[c1] = set()
             if not (c2 in cls_to_neighboring_cls):
                 cls_to_neighboring_cls[c2] = set()
             cls_to_neighboring_cls[c1].add(c2)
             cls_to_neighboring_cls[c2].add(c1)
+    return cls_to_neighboring_cls
+
+
+def get_cluster_to_bridge_points(H: nx.Graph) -> dict[int, set[int]]:
+    cls_to_bridge_points = {}
+    for u in H.nodes():
+        from_node = H.nodes[u]
+        for v in H[u]:
+            to_node = H.nodes[v]
+            if to_node['cluster'] == from_node['cluster']:
+                continue
+            c1 = to_node['cluster']
+            c2 = from_node['cluster']
 
             if not (c1 in cls_to_bridge_points):
                 cls_to_bridge_points[c1] = set()
             if not (c2 in cls_to_bridge_points):
                 cls_to_bridge_points[c2] = set()
-            cls_to_bridge_points[c1].add(v)
-            cls_to_bridge_points[c2].add(u)
-
-    return cls_to_neighboring_cls, cls_to_bridge_points
+            cls_to_bridge_points[c1].add(u)
+            cls_to_bridge_points[c2].add(v)
+    return cls_to_bridge_points
 
 
 def get_cluster_to_centers(X: nx.Graph) -> dict[int, int]:
@@ -121,22 +134,15 @@ def build_center_graph(
     X = nx.Graph()
     for cls, _ in enumerate(communities):
         gc = extract_cluster_list_subgraph(graph, [cls], communities)
-        for c in cluster_to_neighboring_cluster[cls]:
-            gg = extract_cluster_list_subgraph(graph, [cls, c], communities)
-            if not nx.is_connected(gg):
-                print('two clusters is not connected')
-
         if has_coordinates:
             _p: dict[int, dict[int, float]] = {u: {v: get_dist(du, dv) for v, dv in gc.nodes(data=True)} for u, du in
                                                gc.nodes(data=True)}
         else:
-            _p: dict[int, dict[int, float]] = dict(nx.all_pairs_dijkstra_path_length(gc, weight='length'))
-
+            _p: dict[int, dict[int, float]] = dict(nx.all_pairs_bellman_ford_path_length(gc, weight='length'))
         if use_all_point:
             dist = {u: get_path_len(_p[u], communities[cls], p) for u in _p}
         else:
             dist = {u: get_path_len(_p[u], cluster_to_bridge_points[cls], p) for u in _p}
-
         min_path = None
         min_node = 0
         for u in dist:
@@ -151,20 +157,35 @@ def build_center_graph(
         return X
     for u, d in X.nodes(data=True):
         for v in cluster_to_neighboring_cluster[d['cluster']]:
+            dv = X.nodes[centers[v]]
             if has_coordinates:
-                dv = X.nodes[centers[v]]
-                path = np.sqrt((d['x'] - dv['x']) ** 2 + (d['y'] - dv['y']) ** 2)
+                path = np.sqrt((d['x'] - dv['x'])**2 + (d['y'] - dv['y'])**2)
             else:
                 path = nx.single_source_dijkstra(
-                    graph,
+                    extract_cluster_list_subgraph(graph, [d['cluster'], dv['cluster']], communities),
                     u,
                     centers[v],
                     weight='length'
                 )[0]
             X.add_edge(u, centers[v], length=path)
-    if not nx.is_connected(X):
-        print('cluster graph is not connected')
     return X
+
+
+def get_node(H: nx.Graph, cls_to_center: dict, X: nx.Graph):
+    node_from = random.choice(list(H.nodes()))
+    node_to = random.choice(list(H.nodes()))
+    path_len = nx.single_source_dijkstra(H, node_from, node_to, weight='length')
+    c = set()
+    for u in path_len[1]:
+        c.add(H.nodes[u]['cluster'])
+    while len(c) < 5:
+        node_from = random.choice(list(H.nodes()))
+        node_to = random.choice(list(H.nodes()))
+        path_len = nx.single_source_dijkstra(H, node_from, node_to, weight='length')
+        c.clear()
+        for u in path_len[1]:
+            c.add(H.nodes[u]['cluster'])
+    return node_from, node_to
 
 
 def get_node_for_initial_graph_v2(H: nx.Graph):
@@ -172,7 +193,6 @@ def get_node_for_initial_graph_v2(H: nx.Graph):
     f, t = random.choice(nodes), random.choice(nodes)
     while f == t:
         f, t = random.choice(nodes), random.choice(nodes)
-
     return f, t
 
 
@@ -190,14 +210,14 @@ def get_node_for_initial_graph(H: nx.Graph):
 
 
 def generate_layer(H: nx.Graph, resolution: float, p: float = 1, use_all_point: bool = True, communities=None,
-                   has_coordinates: bool = False) -> tuple[GraphLayer, float, float, float]:
+                   has_coordinates: bool = False) -> GraphLayer:
     start = time.time()
     if communities is None:
         communities = resolve_communities(H, resolution)
     build_communities = time.time() - start
     start = time.time()
-    cluster_to_neighboring_clusters, cluster_to_bridge_points = get_cluster_to_neighboring_clusters_and_bridge_points(H)
-
+    cluster_to_neighboring_clusters = get_cluster_to_neighboring_clusters(H)
+    cluster_to_bridge_points = get_cluster_to_bridge_points(H)
     build_additional = time.time() - start
     start = time.time()
 

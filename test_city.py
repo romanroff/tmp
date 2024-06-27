@@ -1,4 +1,5 @@
 import math
+import pickle
 import random
 import sys
 from multiprocessing import Pool
@@ -49,7 +50,7 @@ def calculate(data):
         city_tests.test_graph(G,
                               f'{name}',
                               id,
-                              points=points, pos=NUMBER)
+                              points=points, pos=NUMBER, logs=True)
         # print(name, id)
         NUMBER+=THREADS
 
@@ -59,9 +60,7 @@ if __name__ == '__main__':
     points_number = 500
     if len(sys.argv) == 2:
         total = int(sys.argv[1])
-    else:
-        total = int(sys.argv[1])
-        points_number = int(sys.argv[2])
+
 
     print('THREADS:', total)
     print('POINTS:', points_number)
@@ -84,9 +83,13 @@ if __name__ == '__main__':
         # 'DELHI': 'R1942586',
         # 'KAIR': 'R5466227'
     }
-    total_len = len(cities)
-    l = list(cities.items())
-    data = [[l[i: total_len: total],points_number, i + 1, total] for i in range(total)]
-    # print(data)
-    with Pool(total) as p:
-        p.map(calculate, data)
+    G = get_graph('R71525')
+    with open('PARIS.pkl', 'wb') as fp:
+        pickle.dump(G, fp)
+        fp.close()
+    # total_len = len(cities)
+    # l = list(cities.items())
+    # data = [[l[i: total_len: total],points_number, i + 1, total] for i in range(total)]
+    # # print(data)
+    # with Pool(total) as p:
+    #     p.map(calculate, data)
