@@ -23,6 +23,7 @@ class CentroidResult:
         self.errors: list[float] = []
         self.absolute_time: list[float] = []
         self.absolute_err: list[float] = []
+        self.time: list[dict] = []
 
 
 class CityResult:

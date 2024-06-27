@@ -54,7 +54,8 @@ def generate_result(
         usual_results: tuple[float, list[float]],
         test_results: tuple[float, list[float]],
         resolution: float,
-        layer: GraphLayer
+        layer: GraphLayer,
+        time: dict
 ) -> CentroidResult:
     test_time = test_results[0]
     result = CentroidResult(
@@ -65,7 +66,7 @@ def generate_result(
     )
     result.speed_up.append(abs(usual_results[0] / test_time))
     result.absolute_time.append(test_time)
-
+    result.time.append(time)
     for i, p in enumerate(test_results[1]):
         if p == -1:
             continue
@@ -143,9 +144,18 @@ def test_graph(graph: nx.Graph, name: str, city_id: str, points: list[tuple[int,
                     build_centroid_graph:   {:.3f}
                 pfa time:       {:.3f}
             """.format(a, total, total - tmp[0], build_communities, build_additional, build_centroid_graph, tmp[0])
+            text_dict = {
+                "alpha": a,
+                "total time": total,
+                "prepare time": total - tmp[0],
+                "build_communities": build_communities,
+                "build_additional": build_additional,
+                "build_centroid_graph": build_centroid_graph,
+                "pfa time": tmp[0]
+            }
             if logs:
                 tqdm.write(text)
-            result.points_results.append(generate_result(usual_results, tmp, r, layer))
+            result.points_results.append(generate_result(usual_results, tmp, r, layer, text_dict))
             progres.update(a - prev)
             prev = a
 

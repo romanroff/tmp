@@ -47,7 +47,7 @@ def get_graph(city_id: str = 'R2555133') -> nx.Graph:
 
 def resolve_communities(H: nx.Graph, r: float = 20) -> list[set[int]]:
     communities = nx.community.louvain_communities(H,
-                                                   seed=1534,
+                                                   seed=42,
                                                    weight='length',
                                                    resolution=r)
     cls = []
